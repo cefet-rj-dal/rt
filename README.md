@@ -19,7 +19,7 @@ RT can be applied both as a preprocessing step or as a complete detection proced
 ### `.R` scripts
 
 - **`cod_RT.R`**: Defines the function that performs the RT transformation on a time series.
-- **`cod_dispersion-measures.R`**: Implements various methods for computing local volatility (instantaneous dispersion).
+- **`cod_dispersion-measures.R`**: Implements methods for computing local volatility (instantaneous dispersion).
 - **`cod_exp-eva.R`**: Executes anomaly detection methods on the series and computes evaluation metrics.
 - **`hanr_RTAD.R`**: RTAD implementation within the Harbinger framework.
 - **`FIG1.R`, `FIG2.R`, `FIG3.R`, `FIG4.R`, `FIG5.R` and `TAB2`**: Scripts used to generate all figures and Table 2 from the article.
@@ -46,24 +46,10 @@ RT can be applied both as a preprocessing step or as a complete detection proced
 
 - **Laís Baroni**  
   Federal Center for Technological Education of Rio de Janeiro (CEFET/RJ)  
-  [lais.baroni@eic.cefet-rj.br](mailto:lais.baroni@eic.cefet-rj.br)
-
-- **Carlos Eduardo Mello**  
-  Federal University of the State of Rio de Janeiro (UNIRIO)  
-
-- **Eduardo Mendes**  
-  Getulio Vargas Foundation (FGV)  
-
-- **Esther Pacitti**  
-  University of Montpellier, CNRS, Inria, LIRMM (France)  
-
-- **Fabio Porto**  
-  National Laboratory for Scientific Computing (LNCC)  
-
-- **Rafaelli Coutinho**  
-  Federal Center for Technological Education of Rio de Janeiro (CEFET/RJ)  
-  *Contributed equally.*
-
-- **Eduardo Ogasawara**  
-  Federal Center for Technological Education of Rio de Janeiro (CEFET/RJ)  
-  *Contributed equally.*
+  [lais.baroni@eic.cefet-rj.br](mailto:lais.baroni@eic.cefet-rj.br)Carlos Eduardo Mello
+- **Eduardo Mendes**
+- **Esther Pacitti**
+- **Fabio Porto**
+- **Gustavo Guedes**
+- **Rafaelli Coutinho**
+- **Eduardo Ogasawara**
