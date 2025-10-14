@@ -46,10 +46,11 @@ RT can be applied both as a preprocessing step or as a complete detection proced
 
 - **Laís Baroni**  
   Federal Center for Technological Education of Rio de Janeiro (CEFET/RJ)  
-  [lais.baroni@eic.cefet-rj.br](mailto:lais.baroni@eic.cefet-rj.br)Carlos Eduardo Mello
+  [lais.baroni@eic.cefet-rj.br](mailto:lais.baroni@eic.cefet-rj.br)
+- **Gustavo Guedes**
 - **Eduardo Mendes**
+- **Carlos Eduardo Mello**
 - **Esther Pacitti**
 - **Fabio Porto**
-- **Gustavo Guedes**
 - **Rafaelli Coutinho**
 - **Eduardo Ogasawara**
