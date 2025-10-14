@@ -21,7 +21,7 @@ fc_somaIMF <- function(ceemd.result, inicio, fim){
 }
 
 # function to transform with RT
-fc_RT <- function(noise = 0.001, trials = 5, ws = 30, sigma = sd){
+fc_RT <- function(serie, noise = 0.001, trials = 5, ws = 30, sigma = sd){
   set.seed(123)
   
   id <- 1:length(serie)

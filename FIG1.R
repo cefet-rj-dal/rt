@@ -1,125 +1,185 @@
-library(tidyverse)
-library(readr)
+# Load libraries
+library(ggplot2)
+library(dplyr)
+library(forcats)
+library(tidyr)
 library(patchwork)
+library(readr)
 
-# --- prepare date for barplot  ---
-prepara_dados <- function(path_com, path_sem, tipo) {
-  com_rt <- read_csv(path_com)
-  sem_rt <- read_csv(path_sem)
+# Load data
+metrics <- read_csv("~/Tese/Artigo/metrics_hetero.csv")
+
+# Filter and select relevant columns
+data <- subset(metrics, method!="rtad", select=c("method", "series", "f1", "f1_RT", "precision", "precision_RT", "recall", "recall_RT"))
+
+# Reshape data to long format
+data_long <- data %>%
+  pivot_longer(
+    cols = c(precision, recall, f1, precision_RT, recall_RT, f1_RT),
+    names_to = c("metric", "type"),
+    names_sep = "_",
+    values_to = "value"
+  ) %>%
+  mutate(
+    type = ifelse(is.na(type), "original", toupper(type)),
+    value = as.numeric(value) # <--- ENSURES 'value' IS NUMERIC
+  ) %>%
+  filter(!is.na(value)) # Filter out NAs that might have appeared during conversion
+
+# Calculate descriptive statistics (mean and standard deviation) for bar plots
+summary_data <- data_long %>%
+  group_by(method, metric, type) %>%
+  summarise(
+    mean_value = mean(value, na.rm = TRUE),
+    sd_value = sd(value, na.rm = TRUE),
+    n = n(),
+    se_value = sd_value / sqrt(n), # Standard error of the mean
+    .groups = 'drop'
+  )
+
+# Adjust the order of types for bar plots
+summary_data$type <- factor(summary_data$type, levels = c("RT", "original"))
+
+calculate_metric_comparison <- function(df_long, current_metric) {
+  # Pivot to compare 'original' and 'RT' side by side for each series
+  comparison_data <- df_long %>%
+    filter(metric == current_metric) %>%
+    select(method, series, type, value) %>%
+    pivot_wider(
+      names_from = type,
+      values_from = value,
+      names_prefix = paste0(current_metric, "_"),
+      values_fn = mean
+    )
   
-  colnames(com_rt) <- c("method", "serie", "F1", "precision", "recall")
-  colnames(sem_rt) <- c("method", "serie", "F1", "precision", "recall")
+  original_col_name <- paste0(current_metric, "_original")
+  rt_col_name <- paste0(current_metric, "_RT")
   
-  id_col <- c("method", "serie")
-  
-  com_rt <- com_rt %>% rename_with(~ paste0(., "_com_RT"), -all_of(id_col))
-  sem_rt <- sem_rt %>% rename_with(~ paste0(., "_sem_RT"), -all_of(id_col))
-  
-  full_join(sem_rt, com_rt, by = id_col) %>%
-    pivot_longer(
-      cols = -all_of(id_col),
-      names_to = c("metric", "RT"),
-      names_pattern = "(.*)_(sem|com)_RT",
-      values_to = "value"
+  resumo_comparacao <- comparison_data %>%
+    mutate(
+      # Check if comparison is possible (both values exist)
+      can_compare = !is.na(.data[[rt_col_name]]) & !is.na(.data[[original_col_name]]),
+      
+      # Calculate improvement, deterioration, and tie
+      improved = ifelse(can_compare, .data[[rt_col_name]] > .data[[original_col_name]], FALSE),
+      deteriorated = ifelse(can_compare, .data[[rt_col_name]] < .data[[original_col_name]], FALSE),
+      # Tie if can_compare is TRUE and neither improved nor deteriorated
+      tied = ifelse(can_compare & !improved & !deteriorated, TRUE, FALSE)
     ) %>%
-    mutate(tipo = tipo)
-}
-
-# --- file path ---
-hetero_com <- "~/Tese/Artigo/metodos_hetero_hard_com-RT.csv"
-hetero_sem <- "~/Tese/Artigo/metodos_hetero_hard_sem-RT.csv"
-homo_com   <- "~/Tese/Artigo/metodos_homo_hard_com-RT.csv"
-homo_sem   <- "~/Tese/Artigo/metodos_homo_hard_sem-RT.csv"
-
-# --- data ---
-dados_hetero <- prepara_dados(hetero_com, hetero_sem, "Heterocedástica")
-dados_homo   <- prepara_dados(homo_com, homo_sem, "Homocedástica")
-
-# --- function point plot ---
-grafico_pontos_f1 <- function(path_com, path_sem, titulo) {
-  com_rt <- read_csv(path_com)
-  sem_rt <- read_csv(path_sem)
-  
-  names(com_rt) <- tolower(names(com_rt))
-  names(sem_rt) <- tolower(names(sem_rt))
-  
-  colnames(com_rt)[colnames(com_rt) %in% c("f1", "precision", "recall")] <- paste0(colnames(com_rt)[colnames(com_rt) %in% c("f1", "precision", "recall")], "_com")
-  colnames(sem_rt)[colnames(sem_rt) %in% c("f1", "precision", "recall")] <- paste0(colnames(sem_rt)[colnames(sem_rt) %in% c("f1", "precision", "recall")], "_sem")
-  
-  dados_comp <- inner_join(com_rt, sem_rt, by = c("serie", "method")) %>%
-    mutate(melhorou_f1 = ifelse(!is.na(f1_com) & !is.na(f1_sem), f1_com > f1_sem, NA))
-  
-  resumo_pontos <- dados_comp %>%
     group_by(method) %>%
     summarise(
-      f1_melhorias = sum(melhorou_f1, na.rm = TRUE),
-      f1_total = sum(!is.na(melhorou_f1)),
+      improved_count = sum(improved, na.rm = TRUE),
+      deteriorated_count = sum(deteriorated, na.rm = TRUE),
+      tied_count = sum(tied, na.rm = TRUE),
+      total_series_compared = sum(can_compare, na.rm = TRUE), # Total series where comparison was valid
       .groups = "drop"
     ) %>%
     mutate(
-      percentual = round(100 * f1_melhorias / f1_total, 1),
-      destaque = percentual > 50
+      metric = current_metric,
+      # Avoid division by zero if no series to compare
+      percent_improved = ifelse(total_series_compared == 0, 0, round(100 * improved_count / total_series_compared, 1)),
+      percent_deteriorated = ifelse(total_series_compared == 0, 0, round(100 * deteriorated_count / total_series_compared, 1)),
+      percent_tied = ifelse(total_series_compared == 0, 0, round(100 * tied_count / total_series_compared, 1))
     )
   
-  ordem <- resumo_pontos %>% arrange(percentual) %>% pull(method)
-    
-  g <- ggplot(resumo_pontos, aes(x = percentual, y = factor(method, levels = ordem))) +
-    geom_segment(aes(x = 0, xend = percentual, yend = method), color = "gray70") +
-    geom_point(aes(color = destaque), size = 4) +
-    geom_text(aes(label = paste0(percentual, "%"), x = percentual + 2), hjust = 0, size = 3.5) +
-    scale_color_manual(values = c("TRUE" = "gray20", "FALSE" = "gray70")) +
-    labs(
-      title = titulo,
-      x = "% of time series with improved F1 after RT",
-      y = "Method",
-      color = "Improved in >50% of the series"
-    ) +
-    xlim(0, 105) +
-    theme_minimal() +
-    theme(legend.position = "top")
-  
-  list(plot = g, ordem = ordem)
+  return(resumo_comparacao)
 }
 
-# --- function barplot ---
-grafico_barras_f1 <- function(dados, titulo, ordem) {
-  dados %>%
-    filter(metric == "F1") %>%
-    group_by(method, RT, tipo) %>%
-    summarise(
-      media = mean(value, na.rm = TRUE),
-      erro = sd(value, na.rm = TRUE) / sqrt(n()),
-      .groups = "drop"
-    ) %>%
-    mutate(method = factor(method, levels = rev(ordem))) %>%
-    ggplot(aes(x = method, y = media, fill = RT)) +
-    geom_col(position = position_dodge(width = 0.8), width = 0.7) +
-    geom_errorbar(
-      aes(ymin = media - erro, ymax = media + erro),
-      width = 0.2,
-      position = position_dodge(width = 0.8)
-    ) +
-    scale_fill_grey(start = 0.3, end = 0.8, name = "RT") +
+# Calculate and combine comparison summaries for all metrics
+metrics_to_compare <- c("f1", "precision", "recall")
+all_metrics_comparison_list <- lapply(metrics_to_compare, function(m) calculate_metric_comparison(data_long, m))
+all_metrics_comparison_df <- do.call(rbind, all_metrics_comparison_list)
+
+# Prepare data for stacked bar plot
+stacked_bar_data <- all_metrics_comparison_df %>%
+  pivot_longer(
+    cols = c(percent_improved, percent_deteriorated, percent_tied),
+    names_to = "comparison_type",
+    values_to = "percentage"
+  ) %>%
+  mutate(
+    comparison_type = case_when(
+      comparison_type == "percent_improved" ~ "RT Improved",
+      comparison_type == "percent_deteriorated" ~ "RT Deteriorated",
+      comparison_type == "percent_tied" ~ "RT Tied"
+    )
+  )
+
+# Define the order of categories for stacking and facet labels
+stacked_bar_data$comparison_type <- factor(stacked_bar_data$comparison_type,
+                                           levels = c("RT Deteriorated", "RT Tied", "RT Improved")) # Logical order
+
+stacked_bar_data$metric <- factor(stacked_bar_data$metric,
+                                  levels = c("f1", "precision", "recall"),
+                                  labels = c("F1-score", "Precision", "Recall"))
+
+# Ensure alphabetical order of methods on the Y-axis
+stacked_bar_data$method <- factor(stacked_bar_data$method, levels = sort(unique(stacked_bar_data$method)))
+
+### 1. Creation of Individual Bar Plots (Maintained)
+# Helper function to generate a bar plot for a specific metric
+create_barplot_for_metric <- function(data, selected_metric, plot_title, y_label) {
+  ggplot(filter(data, metric == selected_metric), aes(x = type, y = mean_value, fill = type)) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.2), color = "black") +
+    geom_errorbar(aes(ymin = mean_value - se_value, ymax = mean_value + se_value),
+                  width = 0.1, position = position_dodge(0.2)) + # Adds error bars
+    facet_grid(. ~ method, scales = "free_y") + # Facet only by methods
     labs(
-      title = titulo,
-      x = "Method",
-      y = "F1"
+      title = plot_title,
+      x = NULL,
+      y = y_label,
+      fill = NULL
     ) +
+    scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2)) +
+    scale_fill_manual(values = c("original" = "grey80", "RT" = "grey40")) +
     theme_minimal() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 12),
+      axis.title.y = element_text(face = "bold", size = 10),
+      axis.text.x = element_blank(), # Keep X-axis labels hidden
+      axis.ticks.x = element_blank(), # Remove X-axis ticks
+      strip.text = element_text(face = "bold", size = 10),
+      legend.position = "bottom",
+      panel.grid.major.y = element_line(color = "grey80", linetype = "solid")
+    )
 }
 
-# --- plot heteroscedastic ---
-gp_hetero <- grafico_pontos_f1(hetero_com, hetero_sem, "")
-g_barras_hetero <- grafico_barras_f1(dados_hetero, "F1 for heteroscedastic series", gp_hetero$ordem)
-g_pontos_hetero <- gp_hetero$plot
+# Generate bar plots for Recall, Precision, and F1-score
+barplot_recall <- create_barplot_for_metric(summary_data, "recall", "Recall", "Average Recall")
+barplot_precision <- create_barplot_for_metric(summary_data, "precision", "Precision", "Average Precision")
+barplot_f1 <- create_barplot_for_metric(summary_data, "f1", "F1-score", "Average F1-score")
 
-# --- plot homoscedastic ---
-gp_homo <- grafico_pontos_f1(homo_com, homo_sem, "")
-g_barras_homo <- grafico_barras_f1(dados_homo, "F1 for homoscedastic series", gp_homo$ordem)
-g_pontos_homo <- gp_homo$plot
+stacked_bar_plot <- ggplot(stacked_bar_data, aes(y = method, x = percentage, fill = comparison_type)) +
+  geom_bar(stat = "identity", position = "stack", color = "black") +
+  facet_wrap(~ metric, ncol = 3) + # Facets by metric
+  labs(
+    title = "RT Impact",
+    x = "Percentage of Time Series (%)",
+    y = "Method",
+    fill = "Comparison to Original"
+  ) +
+  scale_fill_manual(values = c("RT Improved" = "grey40", 
+                               "RT Tied" = "grey100",    
+                               "RT Deteriorated" = "grey80")) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 12),
+    axis.title.x = element_text(face = "bold", size = 10),
+    axis.title.y = element_text(face = "bold", size = 10),
+    axis.text.y = element_text(face = "bold", size = 9),
+    strip.text = element_text(face = "bold", size = 10),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold", size = 10),
+    legend.text = element_text(size = 9),
+    panel.grid.major.x = element_line(color = "grey80", linetype = "solid")
+  )
 
-# --- combined ---
-final_plot <- (g_barras_hetero / g_pontos_hetero) | (g_barras_homo / g_pontos_homo)
+# Combine the plots using patchwork
+combined_final_plot <- (barplot_recall + barplot_precision) / (barplot_f1 + stacked_bar_plot) +
+  plot_annotation(
+    title = '',
+    theme = theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16))
+  ) & theme(plot.margin = margin(5, 5, 5, 5)) # Adjusts margins for all subplots
 
-final_plot
+# Display the combined plot
+print(combined_final_plot)

@@ -1,62 +1,35 @@
-# packages
+# Packages
 library(ggplot2)
 library(dplyr)
-library(readr)
-library(tidyr)
 
-# reading data
-dados <- read_delim("~/Tese/Artigo/thresholds_hetero_hard_RTAD.csv", 
-                    delim = ";", escape_double = FALSE, trim_ws = TRUE)
+# Data
+dados <- read_csv("~/Tese/Artigo/metrics_dispersion-measures.csv")
 
+# Median calc
 dados <- dados %>%
-  mutate(across(c(F1, precision, recall), ~as.numeric(gsub(",", ".", .))))
-
-# order by median
-dados <- dados %>%
-  mutate(method = factor(method, levels = names(sort(tapply(F1, method, mean, na.rm = TRUE), decreasing = TRUE)))) %>%
   group_by(method) %>%
-  mutate(mediana_F1 = median(F1, na.rm = TRUE)) %>%
+  mutate(media_F1 = mean(F1, na.rm = TRUE)) %>%
   ungroup() %>%
-  mutate(method = reorder(method, -mediana_F1))
+  mutate(method = reorder(method, -media_F1))  # Ordem decrescente da media
 
-# long shape
-dados_long <- dados %>%
-  pivot_longer(cols = c(F1, precision, recall),
-               names_to = "metrica",
-               values_to = "valor")
+# Prepate data
+resumo <- dados %>%
+  group_by(method) %>%
+  summarise(
+    media = mean(F1, na.rm = TRUE),
+    mediana = median(F1, na.rm = TRUE),
+    q1 = quantile(F1, 0.25, na.rm = TRUE),
+    q3 = quantile(F1, 0.75, na.rm = TRUE)
+  ) %>%
+  mutate(method = reorder(method, -mediana))  # Ordena pela mediana
 
-# renaming
-dados_long$method <- gsub("gaussiano", "gaussian", dados_long$method)
-dados_long$method <- gsub("razao", "ratio", dados_long$method)
-
-# mean by metric
-medias <- dados_long %>%
-  group_by(metrica) %>%
-  summarise(media = mean(valor, na.rm = TRUE))
-
-# create plot
-ggplot(dados_long, aes(x = method, y = valor)) +
-  geom_jitter(aes(color = valor), width = 0.2, alpha = 0.7, size = 1.5) +
-  stat_summary(fun = median, geom = "crossbar", width = 0.4,
-               fatten = 0, color = "black") +
-  facet_wrap(~metrica, scales = "free_y") +
-  scale_color_gradient(low = "gray90", high = "gray10") +
-  coord_cartesian(ylim = c(0, 1)) +
+# plot
+ggplot(resumo, aes(x = method, y = media)) +
+  geom_point(size = 3, color = "black") +
+  geom_errorbar(aes(ymin = q1, ymax = q3), width = 0.2, color = "gray40") +
   theme_minimal() +
-  labs(title = "Evaluation metrics by thresholding technique",
-       x = "Threshold definition technique",
-       y = "Metrics value",
-       color = "Value") +
+  labs(title = "",
+       x = "Dispersion measure",
+       y = "F1-score (mean and IQR)") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-# boxplot
-ggplot(dados_long, aes(x = method, y = valor, fill = method)) +
-  geom_boxplot() +
-  facet_wrap(~metrica, scales = "free_y") +
-  scale_fill_grey(start = 0.3, end = 0.9) +
-  theme_minimal() +
-  labs(title = "Evaluation metrics by thresholding technique",
-       x = "Threshold definition technique",
-       y = "Metrics value") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        legend.position = "none")
