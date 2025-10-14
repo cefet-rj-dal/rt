@@ -10,7 +10,7 @@ To address this challenge, this work proposes the **Resilient Transformation (RT
 
 Evaluations using the Yahoo! S5 dataset (via the Harbinger framework) show that RT enhances the performance of classical methods and can be combined with thresholding to form an autonomous detection method, **RTAD**. Sensitivity analyses indicate that the use of standard deviation and a Gaussian threshold yields the best results.
 
-RT can be applied both as a preprocessing step or as a complete detection procedure (**RTAD**).
+RT can be applied both as a preprocessing step or as a complete detection procedure.
 
 ---
 
