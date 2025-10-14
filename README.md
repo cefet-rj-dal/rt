@@ -29,7 +29,7 @@ RT can be applied both as a preprocessing step or as a complete detection proced
 - **`metrics_hetero.csv`**: Evaluation metrics for methods applied to heteroscedastic series, including both the original and RT-transformed versions.
 - **`metrics_homo.csv`**: Evaluation metrics for methods applied to homoscedastic series, including both the original and RT-transformed versions.
 - **`metrics_dispersion-measures.csv`**: Performance of RTAD with different local dispersion measures.
-- **`thresholds_hetero_hard_RTAD.csv`**: Performance of RTAD using different thresholding strategies.
+- **`metrics_thresholds.csv`**: Performance of RTAD using different thresholding strategies.
 
 ---
 
