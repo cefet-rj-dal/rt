@@ -166,6 +166,8 @@ linhas_resumo <- vector("list", length(detalhes_todos))
 for (k in c(1:length(detalhes_todos))) {
   exp_k   <- detalhes_todos[[k]]
   dados_k <- series_ts[[exp_k$dataref]]
+  dados_k$event <- F
+  dados_k$event[dados_k$type=="anomaly"] <- T
   
   # Avaliação "soft" com janela deslizante (ajuste sw_size conforme o caso)
   avaliacao <- evaluate(har_eval(), exp_k$rs$event, dados_k$event)
